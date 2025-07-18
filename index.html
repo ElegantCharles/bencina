@@ -16,6 +16,27 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             transition: all 0.3s ease;
         }
+
+        // Close modal when clicking outside
+        document.addEventListener('click', function(e) {
+            const modal = document.getElementById('customCarModal');
+            if (e.target === modal) {
+                closeCustomCarModal();
+            }
+        });
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('customCarModal');
+                if (!modal.classList.contains('hidden')) {
+                    closeCustomCarModal();
+                }
+            }
+        });
+
+        // Initialize
+        updateHistory();
         .car-card:hover {
             transform: translateY(-5px);
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
@@ -83,6 +104,53 @@
             <p class="text-lg text-gray-600">Calcula cuánto gastas en combustible según los kilómetros recorridos</p>
         </div>
 
+        <!-- Custom Car Modal -->
+        <div id="customCarModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+            <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full mx-4">
+                <div class="text-center mb-6">
+                    <div class="text-4xl mb-4">🚗</div>
+                    <h2 class="text-2xl font-bold text-gray-800">Auto Personalizado</h2>
+                    <p class="text-gray-600">Ingresa los datos de tu vehículo</p>
+                </div>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            🏷️ Nombre del auto (opcional)
+                        </label>
+                        <input type="text" id="customCarName" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Mi Auto, Toyota Corolla, etc.">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            ⛽ Consumo de combustible *
+                        </label>
+                        <div class="relative">
+                            <input type="number" id="customCarConsumption" class="w-full pr-16 pl-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="12.5" step="0.1" min="1" max="50" required>
+                            <span class="absolute right-3 top-3 text-gray-500">km/L</span>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">💡 Ejemplo: 12.5 km/L, 8.2 km/L, etc.</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            📅 Año/Modelo (opcional)
+                        </label>
+                        <input type="text" id="customCarYear" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="2023, 1.6L 2022, etc.">
+                    </div>
+                </div>
+                
+                <div class="flex gap-3 mt-8">
+                    <button onclick="closeCustomCarModal()" class="flex-1 px-4 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors">
+                        Cancelar
+                    </button>
+                    <button onclick="createCustomCar()" class="flex-1 px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                        Usar Este Auto
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Car Selection -->
         <div id="carSelection" class="mb-8">
             <h2 class="text-2xl font-semibold text-gray-700 mb-6 text-center">Selecciona tu vehículo</h2>
@@ -97,6 +165,26 @@
                     </div>
                     <h3 class="text-xl font-semibold mb-2">Chevrolet Sail</h3>
                     <p class="text-sm opacity-90">1.5L • 2020</p>
+                </div>
+
+                <div class="car-card p-6 rounded-xl text-white cursor-pointer shadow-lg" onclick="selectCar('suzuki-dzire')" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="text-3xl">🚙</div>
+                        <div class="text-right">
+                            <div class="text-sm opacity-75">Consumo</div>
+                            <div class="text-lg font-semibold">15.0 km/L</div>
+                        </div>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-2">Suzuki Dzire</h3>
+                    <p class="text-sm opacity-90">1.2L • 2024</p>
+                </div>
+                
+                <div class="border-2 border-dashed border-blue-400 p-6 rounded-xl cursor-pointer hover:border-blue-600 hover:bg-blue-50 transition-all" onclick="openCustomCarModal()">
+                    <div class="text-center">
+                        <div class="text-3xl mb-4">⚙️</div>
+                        <p class="text-blue-600 font-medium">Auto Personalizado</p>
+                        <p class="text-xs text-gray-500 mt-1">Ingresa tu propio consumo</p>
+                    </div>
                 </div>
                 
                 <!-- Placeholder for future cars -->
@@ -204,6 +292,7 @@
                             <div class="text-sm font-medium text-green-800">
                                 🧠 Distancia estimada por carreteras: <span id="totalMapDistance">0</span> km
                                 <div class="text-xs text-green-600 mt-1" id="routingStatus">Agrega puntos para calcular distancia...</div>
+                                <div class="text-xs text-blue-600 mt-1" id="roundTripStatus" style="display: none;">🔄 Incluye viaje de ida y vuelta</div>
                             </div>
                         </div>
                     </div>
@@ -275,6 +364,12 @@
                 model: '1.5L • 2020',
                 consumption: 10.2, // km/L
                 icon: '🚗'
+            },
+            'suzuki-dzire': {
+                name: 'Suzuki Dzire',
+                model: '1.2L • 2024',
+                consumption: 15.0, // km/L
+                icon: '🚙'
             }
         };
 
@@ -289,6 +384,7 @@
         let multipleSegmentsActive = false;
         let routingControl = null;
         let totalRealDistance = 0;
+        let isRoundTrip = false;
 
         function selectCar(carId) {
             selectedCar = cars[carId];
@@ -386,8 +482,8 @@
         function initializeMap() {
             if (map) return; // Map already initialized
             
-            // Initialize map centered on Valparaíso, Chile (since you're from there!)
-            map = L.map('map').setView([-33.047237, -71.612686], 12);
+            // Initialize map centered on San Antonio, Chile (tu ciudad!)
+            map = L.map('map').setView([-33.592281, -71.605512], 13);
             
             // Add OpenStreetMap tiles
             L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -459,8 +555,14 @@
             }
         }
 
+        function isNearCoast(point) {
+            // Chile's coast in Valparaíso region is roughly around longitude -71.5 to -71.7
+            // More precise coastal detection for this region
+            return point.lng < -71.4 && point.lng > -72.0;
+        }
+
         function calculateSmartDistance() {
-            totalRealDistance = 0;
+            let baseDistance = 0;
             
             // Calculate distance for each segment using road factor estimation
             for (let i = 0; i < waypoints.length - 1; i++) {
@@ -474,11 +576,15 @@
                 const roadFactor = calculateRoadFactor(straightDistance, start, end);
                 const estimatedRoadDistance = straightDistance * roadFactor;
                 
-                totalRealDistance += estimatedRoadDistance;
+                baseDistance += estimatedRoadDistance;
             }
             
+            // Apply round trip multiplier if enabled
+            totalRealDistance = isRoundTrip ? baseDistance * 2 : baseDistance;
+            
             updateTotalDistance();
-            document.getElementById('routingStatus').textContent = 'Distancia estimada por carreteras calculada ✓';
+            const tripType = isRoundTrip ? 'ida y vuelta' : 'solo ida';
+            document.getElementById('routingStatus').textContent = `Distancia estimada por carreteras calculada (${tripType}) ✓`;
             
             // Draw visual line connecting all waypoints
             routeLine = L.polyline(waypoints, {
@@ -569,10 +675,32 @@
             return false;
         }
 
-        function isNearCoast(point) {
-            // Chile's coast in Valparaíso region is roughly around longitude -71.5 to -71.7
-            // More precise coastal detection for this region
-            return point.lng < -71.4 && point.lng > -72.0;
+        function toggleRoundTrip() {
+            isRoundTrip = !isRoundTrip;
+            const btn = document.getElementById('roundTripBtn');
+            const status = document.getElementById('roundTripStatus');
+            
+            if (isRoundTrip) {
+                btn.textContent = '🔄 Solo Ida';
+                btn.classList.remove('bg-green-500', 'hover:bg-green-600');
+                btn.classList.add('bg-orange-500', 'hover:bg-orange-600');
+                status.style.display = 'block';
+            } else {
+                btn.textContent = '🔄 Ida y Vuelta';
+                btn.classList.remove('bg-orange-500', 'hover:bg-orange-600');
+                btn.classList.add('bg-green-500', 'hover:bg-green-600');
+                status.style.display = 'none';
+            
+            // Update UI
+            updateWaypointsList();
+            updateTotalDistance();
+            document.getElementById('routingStatus').textContent = 'Agrega puntos para calcular distancia...';
+            }
+            
+            // Recalculate distance if we have waypoints
+            if (waypoints.length >= 2) {
+                calculateSmartDistance();
+            }
         }
 
         function updateWaypointsList() {
@@ -632,7 +760,14 @@
                     routeLine = null;
                 }
                 updateTotalDistance();
-                document.getElementById('routingStatus').textContent = 'Agrega puntos para calcular distancia...';
+                // Reset round trip
+            isRoundTrip = false;
+            const btn = document.getElementById('roundTripBtn');
+            const status = document.getElementById('roundTripStatus');
+            btn.textContent = '🔄 Ida y Vuelta';
+            btn.classList.remove('bg-orange-500', 'hover:bg-orange-600');
+            btn.classList.add('bg-green-500', 'hover:bg-green-600');
+            status.style.display = 'none';
             }
             
             updateWaypointsList();
@@ -719,7 +854,8 @@
             } else {
                 const mapDistance = document.getElementById('totalMapDistance').textContent;
                 kilometers = parseFloat(mapDistance) || 0;
-                tripDetails = `${waypoints.length} puntos (estimación inteligente)`;
+                const tripType = isRoundTrip ? 'ida y vuelta' : 'solo ida';
+                tripDetails = `${waypoints.length} puntos (${tripType})`;
             }
 
             if (!fuelPrice || !kilometers || fuelPrice <= 0 || kilometers <= 0) {
@@ -807,8 +943,73 @@
             }
         }
 
-        // Initialize
-        updateHistory();
+        function openCustomCarModal() {
+            document.getElementById('customCarModal').classList.remove('hidden');
+            // Clear previous values
+            document.getElementById('customCarName').value = '';
+            document.getElementById('customCarConsumption').value = '';
+            document.getElementById('customCarYear').value = '';
+            // Focus on consumption field
+            setTimeout(() => {
+                document.getElementById('customCarConsumption').focus();
+            }, 100);
+        }
+
+        function closeCustomCarModal() {
+            document.getElementById('customCarModal').classList.add('hidden');
+        }
+
+        function createCustomCar() {
+            const consumption = parseFloat(document.getElementById('customCarConsumption').value);
+            
+            if (!consumption || consumption <= 0 || consumption > 50) {
+                alert('Por favor ingresa un consumo válido entre 1 y 50 km/L');
+                return;
+            }
+
+            let carName = document.getElementById('customCarName').value.trim();
+            let carYear = document.getElementById('customCarYear').value.trim();
+            
+            // Default values if not provided
+            if (!carName) carName = 'Mi Auto';
+            if (!carYear) carYear = 'Personalizado';
+
+            // Create custom car object
+            const customCar = {
+                name: carName,
+                model: carYear,
+                consumption: consumption,
+                icon: '🚗',
+                isCustom: true
+            };
+
+            // Close modal and select the custom car
+            closeCustomCarModal();
+            selectCustomCar(customCar);
+        }
+
+        function selectCustomCar(customCar) {
+            selectedCar = customCar;
+            document.getElementById('carSelection').classList.add('hidden');
+            document.getElementById('calculator').classList.remove('hidden');
+            
+            // Update selected car info with custom styling for custom cars
+            const customBadge = customCar.isCustom ? '<span class="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full ml-2">Personalizado</span>' : '';
+            
+            document.getElementById('selectedCarInfo').innerHTML = `
+                <div class="flex items-center">
+                    <div class="text-4xl mr-4">${selectedCar.icon}</div>
+                    <div class="flex-1">
+                        <div class="flex items-center">
+                            <h3 class="text-xl font-semibold text-gray-700">${selectedCar.name}</h3>
+                            ${customBadge}
+                        </div>
+                        <p class="text-gray-600">${selectedCar.model}</p>
+                        <p class="text-sm text-blue-600 font-medium">Consumo: ${selectedCar.consumption} km/L</p>
+                    </div>
+                </div>
+            `;
+        }
     </script>
 </body>
 </html>
