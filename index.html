@@ -470,43 +470,94 @@
         }
 
         function calculateSingleRoute(start, end) {
-            // Create a hidden routing control to get the route data
-            const hiddenControl = L.Routing.control({
-                waypoints: [start, end],
-                router: L.Routing.osrmv1({
-                    serviceUrl: 'https://routing.openstreetmap.de/routed-car'
-                }),
-                createMarker: function() { return null; }, // Don't create markers
-                lineOptions: {
-                    styles: [{ color: 'red', weight: 4, opacity: 0.7 }]
+            // Try multiple routing services for reliability
+            const routingServices = [
+                {
+                    name: 'OpenRoute Service',
+                    router: L.Routing.osrmv1({
+                        serviceUrl: 'https://api.openrouteservice.org/v2/directions/driving-car',
+                        profile: 'driving-car'
+                    })
                 },
-                show: false,
-                addWaypoints: false,
-                routeWhileDragging: false
-            });
+                {
+                    name: 'Local Fallback',
+                    router: L.Routing.osrmv1({
+                        serviceUrl: 'https://router.project-osrm.org/route/v1/driving'
+                    })
+                }
+            ];
 
-            hiddenControl.on('routesfound', function(e) {
-                const route = e.routes[0];
-                const distance = route.summary.totalDistance / 1000; // Convert to km
-                totalRealDistance = distance;
-                
-                updateTotalDistance();
-                document.getElementById('routingStatus').textContent = 'Ruta calculada ✓';
-                
-                // Remove the hidden control after getting the data
-                map.removeControl(hiddenControl);
-            });
+            let serviceIndex = 0;
 
-            hiddenControl.on('routingerror', function(e) {
-                console.log('Routing error:', e);
-                // Fallback to straight line distance
-                const distance = map.distance(start, end) / 1000;
-                totalRealDistance = distance;
-                updateTotalDistance();
-                document.getElementById('routingStatus').textContent = 'Usando distancia aproximada (sin ruta por calles)';
-            });
+            function tryRouting() {
+                if (serviceIndex >= routingServices.length) {
+                    // All services failed, use straight line distance
+                    console.log('All routing services failed, using straight line distance');
+                    const distance = map.distance(start, end) / 1000;
+                    totalRealDistance = distance;
+                    updateTotalDistance();
+                    document.getElementById('routingStatus').textContent = 'Usando distancia directa (sin routing disponible)';
+                    return;
+                }
 
-            hiddenControl.addTo(map);
+                const service = routingServices[serviceIndex];
+                console.log(`Trying routing service: ${service.name}`);
+
+                const hiddenControl = L.Routing.control({
+                    waypoints: [start, end],
+                    router: service.router,
+                    createMarker: function() { return null; },
+                    lineOptions: {
+                        styles: [{ color: 'red', weight: 4, opacity: 0.7 }]
+                    },
+                    show: false,
+                    addWaypoints: false,
+                    routeWhileDragging: false
+                });
+
+                let routingCompleted = false;
+
+                hiddenControl.on('routesfound', function(e) {
+                    if (routingCompleted) return;
+                    routingCompleted = true;
+                    
+                    const route = e.routes[0];
+                    const distance = route.summary.totalDistance / 1000;
+                    totalRealDistance = distance;
+                    
+                    updateTotalDistance();
+                    document.getElementById('routingStatus').textContent = `Ruta calculada con ${service.name} ✓`;
+                    
+                    map.removeControl(hiddenControl);
+                });
+
+                hiddenControl.on('routingerror', function(e) {
+                    if (routingCompleted) return;
+                    routingCompleted = true;
+                    
+                    console.log(`${service.name} failed:`, e);
+                    map.removeControl(hiddenControl);
+                    
+                    // Try next service
+                    serviceIndex++;
+                    setTimeout(tryRouting, 100);
+                });
+
+                // Timeout fallback
+                setTimeout(() => {
+                    if (!routingCompleted) {
+                        routingCompleted = true;
+                        console.log(`${service.name} timed out`);
+                        map.removeControl(hiddenControl);
+                        serviceIndex++;
+                        tryRouting();
+                    }
+                }, 5000);
+
+                hiddenControl.addTo(map);
+            }
+
+            tryRouting();
         }
 
         function calculateMultipleRoutes() {
@@ -514,28 +565,13 @@
             let routesCalculated = 0;
             const totalRoutes = waypoints.length - 1;
             
-            // Calculate distance for each segment
+            // Calculate distance for each segment with fallback
             for (let i = 0; i < waypoints.length - 1; i++) {
                 const start = waypoints[i];
                 const end = waypoints[i + 1];
                 
-                const hiddenControl = L.Routing.control({
-                    waypoints: [start, end],
-                    router: L.Routing.osrmv1({
-                        serviceUrl: 'https://routing.openstreetmap.de/routed-car'
-                    }),
-                    createMarker: function() { return null; },
-                    show: false,
-                    addWaypoints: false,
-                    routeWhileDragging: false
-                });
-
-                hiddenControl.on('routesfound', function(e) {
-                    const route = e.routes[0];
-                    const distance = route.summary.totalDistance / 1000;
-                    totalRealDistance += distance;
+                calculateSegmentWithFallback(start, end, i, () => {
                     routesCalculated++;
-                    
                     if (routesCalculated === totalRoutes) {
                         updateTotalDistance();
                         document.getElementById('routingStatus').textContent = 'Ruta completa calculada ✓';
@@ -550,37 +586,63 @@
                         
                         map.fitBounds(routeLine.getBounds(), { padding: [20, 20] });
                     }
-                    
-                    map.removeControl(hiddenControl);
                 });
+            }
+        }
 
-                hiddenControl.on('routingerror', function(e) {
-                    console.log('Routing error for segment', i, ':', e);
-                    // Fallback to straight line distance for this segment
+        function calculateSegmentWithFallback(start, end, segmentIndex, callback) {
+            // Try to route this segment, fall back to straight line if fails
+            let routingCompleted = false;
+
+            const hiddenControl = L.Routing.control({
+                waypoints: [start, end],
+                router: L.Routing.osrmv1({
+                    serviceUrl: 'https://router.project-osrm.org/route/v1/driving'
+                }),
+                createMarker: function() { return null; },
+                show: false,
+                addWaypoints: false,
+                routeWhileDragging: false
+            });
+
+            hiddenControl.on('routesfound', function(e) {
+                if (routingCompleted) return;
+                routingCompleted = true;
+                
+                const route = e.routes[0];
+                const distance = route.summary.totalDistance / 1000;
+                totalRealDistance += distance;
+                
+                map.removeControl(hiddenControl);
+                callback();
+            });
+
+            hiddenControl.on('routingerror', function(e) {
+                if (routingCompleted) return;
+                routingCompleted = true;
+                
+                console.log(`Routing error for segment ${segmentIndex}:`, e);
+                // Fallback to straight line distance
+                const distance = map.distance(start, end) / 1000;
+                totalRealDistance += distance;
+                
+                map.removeControl(hiddenControl);
+                callback();
+            });
+
+            // Timeout fallback
+            setTimeout(() => {
+                if (!routingCompleted) {
+                    routingCompleted = true;
+                    console.log(`Segment ${segmentIndex} timed out, using straight line`);
                     const distance = map.distance(start, end) / 1000;
                     totalRealDistance += distance;
-                    routesCalculated++;
-                    
-                    if (routesCalculated === totalRoutes) {
-                        updateTotalDistance();
-                        document.getElementById('routingStatus').textContent = 'Ruta calculada (algunas partes aproximadas)';
-                        
-                        // Draw visual line
-                        routeLine = L.polyline(waypoints, {
-                            color: 'red',
-                            weight: 4,
-                            opacity: 0.7,
-                            dashArray: '10, 5'
-                        }).addTo(map);
-                        
-                        map.fitBounds(routeLine.getBounds(), { padding: [20, 20] });
-                    }
-                    
                     map.removeControl(hiddenControl);
-                });
+                    callback();
+                }
+            }, 8000);
 
-                hiddenControl.addTo(map);
-            }
+            hiddenControl.addTo(map);
         }
 
         function updateWaypointsList() {
