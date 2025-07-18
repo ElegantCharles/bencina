@@ -29,7 +29,7 @@ Una aplicación web moderna y fácil de usar para calcular el gasto en combustib
 
 ## 🚀 Demo en Vivo
 
-[Ver Demo](https://tu-usuario.github.io/calculadora-combustible) *(actualiza con tu URL)*
+[Ver Demo](elegantcharles.github.io/bencina/) *(actualiza con tu URL)*
 
 
 ## 🛠️ Tecnologías Utilizadas
@@ -61,7 +61,7 @@ Una aplicación web moderna y fácil de usar para calcular el gasto en combustib
 ## 🚀 Instalación y Uso
 
 ### Opción 1: Usar Directamente
-1. Visita la [demo en vivo](https://tu-usuario.github.io/calculadora-combustible)
+1. Visita la [demo en vivo](elegantcharles.github.io/bencina/)
 2. ¡Empieza a calcular tus gastos!
 
 ### Opción 2: Clonar Repositorio
@@ -127,7 +127,7 @@ La app utiliza un algoritmo propietario que considera:
 ```
 
 ### 🐛 **Reportar Bugs**
-1. Abre un [Issue](https://github.com/tu-usuario/calculadora-combustible/issues)
+1. Abre un [Issue]
 2. Describe el problema detalladamente
 3. Incluye pasos para reproducir
 
@@ -160,8 +160,8 @@ Este proyecto está bajo la **Licencia MIT** - mira el archivo [LICENSE](LICENSE
 
 - **👤 Autor**: Tu Nombre
 - **📧 Email**: tu.email@ejemplo.com
-- **🐙 GitHub**: [@tu-usuario](https://github.com/tu-usuario)
-- **🌐 Website**: [tu-website.com](https://tu-website.com)
+- **🐙 GitHub**: [@tu-usuario](https://github.com/ElegantCharles)
+- **🌐 Website**: [tu-website.com](https://charleslettuce.me)
 
 ---
 
