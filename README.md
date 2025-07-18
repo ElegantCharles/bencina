@@ -29,7 +29,7 @@ Una aplicación web moderna y fácil de usar para calcular el gasto en combustib
 
 ## 🚀 Demo en Vivo
 
-[Ver Demo](elegantcharles.github.io/bencina/) *(actualiza con tu URL)*
+[Ver Demo](https://elegantcharles.github.io/bencina/)
 
 
 ## 🛠️ Tecnologías Utilizadas
@@ -61,7 +61,7 @@ Una aplicación web moderna y fácil de usar para calcular el gasto en combustib
 ## 🚀 Instalación y Uso
 
 ### Opción 1: Usar Directamente
-1. Visita la [demo en vivo](elegantcharles.github.io/bencina/)
+1. Visita la [demo en vivo](https://elegantcharles.github.io/bencina/)
 2. ¡Empieza a calcular tus gastos!
 
 ### Opción 2: Clonar Repositorio
