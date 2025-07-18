@@ -7,6 +7,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <!-- Leaflet Routing Machine CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
@@ -172,16 +174,16 @@
                 <div id="mapInput" class="hidden">
                     <div class="map-instructions">
                         <div class="flex items-center mb-2">
-                            <span class="text-2xl mr-3">📍</span>
+                            <span class="text-2xl mr-3">🛣️</span>
                             <div>
-                                <strong>Instrucciones:</strong> Haz clic en el mapa para crear tu ruta
+                                <strong>Rutas por calles reales:</strong> Haz clic en el mapa para crear tu ruta
                             </div>
                         </div>
                         <div class="text-sm opacity-90 ml-9">
                             • 1° clic: Origen 🚩<br>
                             • 2° clic: Destino/Parada 🏁<br>
                             • 3° clic: Otra parada 🎯 (opcional)<br>
-                            • Y así sucesivamente...
+                            • ✨ Calcula distancia real por calles/carreteras
                         </div>
                     </div>
                     
@@ -200,7 +202,8 @@
                         </div>
                         <div class="mt-3 p-3 bg-green-50 rounded-lg">
                             <div class="text-sm font-medium text-green-800">
-                                📏 Distancia total: <span id="totalMapDistance">0</span> km
+                                🛣️ Distancia real por calles: <span id="totalMapDistance">0</span> km
+                                <div class="text-xs text-green-600 mt-1" id="routingStatus">Calculando ruta por calles...</div>
                             </div>
                         </div>
                     </div>
@@ -261,6 +264,8 @@
 
     <!-- Leaflet JavaScript -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Leaflet Routing Machine JavaScript -->
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
     <script>
         // Car data
@@ -282,6 +287,8 @@
         let routeLine = null;
         let segmentCount = 0;
         let multipleSegmentsActive = false;
+        let routingControl = null;
+        let totalRealDistance = 0;
 
         function selectCar(carId) {
             selectedCar = cars[carId];
@@ -404,6 +411,7 @@
                 markerType = 'origin';
                 popupText = '🚩 Origen';
                 markerIcon = '🚩';
+                document.getElementById('routingStatus').textContent = 'Agrega un destino para calcular ruta...';
             } else if (waypoints.length === 2) {
                 // First destination
                 markerType = 'destination';
@@ -428,27 +436,150 @@
             
             markers.push(marker);
             
-            // Update route line
-            updateRouteLine();
-            updateWaypointsList();
-            updateTotalDistance();
-        }
-
-        function updateRouteLine() {
-            if (routeLine) {
-                map.removeLayer(routeLine);
+            // Calculate real route if we have at least 2 points
+            if (waypoints.length >= 2) {
+                calculateRealRoute();
             }
             
-            if (waypoints.length >= 2) {
-                routeLine = L.polyline(waypoints, {
-                    color: 'red',
-                    weight: 4,
-                    opacity: 0.7,
-                    dashArray: '10, 5'
-                }).addTo(map);
+            updateWaypointsList();
+        }
+
+        function calculateRealRoute() {
+            document.getElementById('routingStatus').textContent = 'Calculando ruta por calles...';
+            
+            // Remove existing routing control
+            if (routingControl) {
+                map.removeControl(routingControl);
+                routingControl = null;
+            }
+
+            // Remove existing route line
+            if (routeLine) {
+                map.removeLayer(routeLine);
+                routeLine = null;
+            }
+
+            // Calculate route for consecutive waypoints
+            if (waypoints.length === 2) {
+                // Simple route between two points
+                calculateSingleRoute(waypoints[0], waypoints[1]);
+            } else if (waypoints.length > 2) {
+                // Multiple waypoints - calculate total distance by segments
+                calculateMultipleRoutes();
+            }
+        }
+
+        function calculateSingleRoute(start, end) {
+            // Create a hidden routing control to get the route data
+            const hiddenControl = L.Routing.control({
+                waypoints: [start, end],
+                router: L.Routing.osrmv1({
+                    serviceUrl: 'https://routing.openstreetmap.de/routed-car'
+                }),
+                createMarker: function() { return null; }, // Don't create markers
+                lineOptions: {
+                    styles: [{ color: 'red', weight: 4, opacity: 0.7 }]
+                },
+                show: false,
+                addWaypoints: false,
+                routeWhileDragging: false
+            });
+
+            hiddenControl.on('routesfound', function(e) {
+                const route = e.routes[0];
+                const distance = route.summary.totalDistance / 1000; // Convert to km
+                totalRealDistance = distance;
                 
-                // Fit map to show all waypoints
-                map.fitBounds(routeLine.getBounds(), { padding: [20, 20] });
+                updateTotalDistance();
+                document.getElementById('routingStatus').textContent = 'Ruta calculada ✓';
+                
+                // Remove the hidden control after getting the data
+                map.removeControl(hiddenControl);
+            });
+
+            hiddenControl.on('routingerror', function(e) {
+                console.log('Routing error:', e);
+                // Fallback to straight line distance
+                const distance = map.distance(start, end) / 1000;
+                totalRealDistance = distance;
+                updateTotalDistance();
+                document.getElementById('routingStatus').textContent = 'Usando distancia aproximada (sin ruta por calles)';
+            });
+
+            hiddenControl.addTo(map);
+        }
+
+        function calculateMultipleRoutes() {
+            totalRealDistance = 0;
+            let routesCalculated = 0;
+            const totalRoutes = waypoints.length - 1;
+            
+            // Calculate distance for each segment
+            for (let i = 0; i < waypoints.length - 1; i++) {
+                const start = waypoints[i];
+                const end = waypoints[i + 1];
+                
+                const hiddenControl = L.Routing.control({
+                    waypoints: [start, end],
+                    router: L.Routing.osrmv1({
+                        serviceUrl: 'https://routing.openstreetmap.de/routed-car'
+                    }),
+                    createMarker: function() { return null; },
+                    show: false,
+                    addWaypoints: false,
+                    routeWhileDragging: false
+                });
+
+                hiddenControl.on('routesfound', function(e) {
+                    const route = e.routes[0];
+                    const distance = route.summary.totalDistance / 1000;
+                    totalRealDistance += distance;
+                    routesCalculated++;
+                    
+                    if (routesCalculated === totalRoutes) {
+                        updateTotalDistance();
+                        document.getElementById('routingStatus').textContent = 'Ruta completa calculada ✓';
+                        
+                        // Draw visual line connecting all waypoints
+                        routeLine = L.polyline(waypoints, {
+                            color: 'red',
+                            weight: 4,
+                            opacity: 0.7,
+                            dashArray: '10, 5'
+                        }).addTo(map);
+                        
+                        map.fitBounds(routeLine.getBounds(), { padding: [20, 20] });
+                    }
+                    
+                    map.removeControl(hiddenControl);
+                });
+
+                hiddenControl.on('routingerror', function(e) {
+                    console.log('Routing error for segment', i, ':', e);
+                    // Fallback to straight line distance for this segment
+                    const distance = map.distance(start, end) / 1000;
+                    totalRealDistance += distance;
+                    routesCalculated++;
+                    
+                    if (routesCalculated === totalRoutes) {
+                        updateTotalDistance();
+                        document.getElementById('routingStatus').textContent = 'Ruta calculada (algunas partes aproximadas)';
+                        
+                        // Draw visual line
+                        routeLine = L.polyline(waypoints, {
+                            color: 'red',
+                            weight: 4,
+                            opacity: 0.7,
+                            dashArray: '10, 5'
+                        }).addTo(map);
+                        
+                        map.fitBounds(routeLine.getBounds(), { padding: [20, 20] });
+                    }
+                    
+                    map.removeControl(hiddenControl);
+                });
+
+                hiddenControl.addTo(map);
             }
         }
 
@@ -497,24 +628,32 @@
             map.removeLayer(markers[index]);
             markers.splice(index, 1);
             
-            updateRouteLine();
+            // Reset total distance
+            totalRealDistance = 0;
+            
+            if (waypoints.length >= 2) {
+                calculateRealRoute();
+            } else {
+                // Remove route line if less than 2 waypoints
+                if (routeLine) {
+                    map.removeLayer(routeLine);
+                    routeLine = null;
+                }
+                updateTotalDistance();
+                document.getElementById('routingStatus').textContent = 'Agrega puntos para calcular ruta...';
+            }
+            
             updateWaypointsList();
-            updateTotalDistance();
         }
 
         function updateTotalDistance() {
             if (waypoints.length < 2) {
                 document.getElementById('totalMapDistance').textContent = '0';
+                totalRealDistance = 0;
                 return;
             }
             
-            let totalDistance = 0;
-            for (let i = 0; i < waypoints.length - 1; i++) {
-                totalDistance += map.distance(waypoints[i], waypoints[i + 1]);
-            }
-            
-            const distanceKm = (totalDistance / 1000).toFixed(2);
-            document.getElementById('totalMapDistance').textContent = distanceKm;
+            document.getElementById('totalMapDistance').textContent = totalRealDistance.toFixed(2);
         }
 
         function resetMap() {
@@ -528,12 +667,20 @@
                 routeLine = null;
             }
             
-            // Clear waypoints
+            // Clear routing control
+            if (routingControl) {
+                map.removeControl(routingControl);
+                routingControl = null;
+            }
+            
+            // Clear waypoints and reset distance
             waypoints = [];
+            totalRealDistance = 0;
             
             // Update UI
             updateWaypointsList();
             updateTotalDistance();
+            document.getElementById('routingStatus').textContent = 'Agrega puntos para calcular ruta...';
         }
 
         function goBack() {
@@ -580,7 +727,7 @@
             } else {
                 const mapDistance = document.getElementById('totalMapDistance').textContent;
                 kilometers = parseFloat(mapDistance) || 0;
-                tripDetails = `${waypoints.length} puntos en mapa`;
+                tripDetails = `${waypoints.length} puntos (ruta real)`;
             }
 
             if (!fuelPrice || !kilometers || fuelPrice <= 0 || kilometers <= 0) {
@@ -601,14 +748,11 @@
             // Show trip breakdown for multi-destination trips
             let breakdownHtml = '';
             if (currentTab === 'map' && waypoints.length > 2) {
-                breakdownHtml = '<div class="mt-4 p-4 bg-gray-50 rounded-lg"><h4 class="font-semibold text-gray-700 mb-2">🗺️ Desglose del viaje:</h4>';
-                for (let i = 0; i < waypoints.length - 1; i++) {
-                    const segmentDistance = map.distance(waypoints[i], waypoints[i + 1]) / 1000;
-                    const segmentCost = (segmentDistance / selectedCar.consumption) * fuelPrice;
-                    const fromLabel = i === 0 ? 'Origen' : `Parada ${i}`;
-                    const toLabel = i === waypoints.length - 2 ? 'Destino' : `Parada ${i + 1}`;
-                    breakdownHtml += `<div class="text-sm text-gray-600">${fromLabel} → ${toLabel}: ${segmentDistance.toFixed(1)} km ($${segmentCost.toFixed(0)})</div>`;
-                }
+                breakdownHtml = '<div class="mt-4 p-4 bg-gray-50 rounded-lg"><h4 class="font-semibold text-gray-700 mb-2">🗺️ Desglose del viaje por calles reales:</h4>';
+                // Note: For multiple waypoints, we show total distance since individual segment distances 
+                // would require storing them separately during route calculation
+                breakdownHtml += `<div class="text-sm text-gray-600">Ruta total con ${waypoints.length} puntos: ${kilometers.toFixed(1)} km (${totalCost.toFixed(0)})</div>`;
+                breakdownHtml += '<div class="text-xs text-gray-500 mt-1">💡 Distancia calculada por calles y carreteras reales</div>';
                 breakdownHtml += '</div>';
             }
             
