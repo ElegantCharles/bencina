@@ -386,8 +386,8 @@
         function initializeMap() {
             if (map) return; // Map already initialized
             
-            // Initialize map centered on Santiago, Chile
-            map = L.map('map').setView([-33.4489, -70.6693], 12);
+            // Initialize map centered on Valparaíso, Chile (since you're from there!)
+            map = L.map('map').setView([-33.047237, -71.612686], 12);
             
             // Add OpenStreetMap tiles
             L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -532,22 +532,47 @@
         }
 
         function isInUrbanArea(point) {
-            // Santiago metropolitan area rough boundaries
-            const santiagoLat = -33.4489;
-            const santiagoLng = -70.6693;
-            const urbanRadius = 0.5; // degrees, roughly 55km
+            // Define urban areas in Valparaíso Region
+            const urbanAreas = [
+                {
+                    name: 'Gran Valparaíso',
+                    lat: -33.047237,
+                    lng: -71.612686,
+                    radius: 0.3 // degrees, roughly 33km
+                },
+                {
+                    name: 'San Antonio',
+                    lat: -33.592281,
+                    lng: -71.605512,
+                    radius: 0.15 // degrees, roughly 16km
+                },
+                {
+                    name: 'Santiago',
+                    lat: -33.4489,
+                    lng: -70.6693,
+                    radius: 0.5 // degrees, roughly 55km
+                }
+            ];
             
-            const distance = Math.sqrt(
-                Math.pow(point.lat - santiagoLat, 2) + 
-                Math.pow(point.lng - santiagoLng, 2)
-            );
+            // Check if point is within any urban area
+            for (let area of urbanAreas) {
+                const distance = Math.sqrt(
+                    Math.pow(point.lat - area.lat, 2) + 
+                    Math.pow(point.lng - area.lng, 2)
+                );
+                
+                if (distance < area.radius) {
+                    return true;
+                }
+            }
             
-            return distance < urbanRadius;
+            return false;
         }
 
         function isNearCoast(point) {
-            // Chile's coast is roughly around longitude -71 to -74
-            return point.lng < -70.5 && point.lng > -74.5;
+            // Chile's coast in Valparaíso region is roughly around longitude -71.5 to -71.7
+            // More precise coastal detection for this region
+            return point.lng < -71.4 && point.lng > -72.0;
         }
 
         function updateWaypointsList() {
