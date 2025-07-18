@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Calculadora de Consumo</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
@@ -22,10 +24,57 @@
         .calculator-section {
             background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
         }
+        .map-container {
+            height: 450px;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .map-instructions {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+        .distance-display {
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            padding: 16px;
+            border-radius: 12px;
+            text-align: center;
+            margin-top: 16px;
+        }
+        .tab-button {
+            transition: all 0.3s ease;
+        }
+        .tab-button.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .waypoint-item {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: between;
+        }
+        .waypoint-item.origin { border-color: #10b981; }
+        .waypoint-item.destination { border-color: #ef4444; }
+        .waypoint-item.stop { border-color: #f59e0b; }
+        .waypoint-controls {
+            background: white;
+            padding: 16px;
+            border-radius: 12px;
+            margin-top: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
-    <div class="container mx-auto px-4 py-8 max-w-4xl">
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
         <!-- Header -->
         <div class="text-center mb-12">
             <h1 class="text-4xl font-bold text-gray-800 mb-4">⛽ Calculadora de Consumo</h1>
@@ -71,29 +120,105 @@
                 <!-- Car info will be populated here -->
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="bg-white p-6 rounded-xl shadow-sm">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        💰 Precio actual de la bencina (por litro)
-                    </label>
-                    <div class="relative">
-                        <span class="absolute left-3 top-3 text-gray-500">$</span>
-                        <input type="number" id="fuelPrice" class="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="1500" step="0.01">
+            <!-- Distance Input Method Tabs -->
+            <div class="bg-white p-6 rounded-xl shadow-sm mb-6">
+                <div class="flex mb-4 bg-gray-100 rounded-lg p-1">
+                    <button id="manualTab" class="tab-button flex-1 py-2 px-4 rounded-md font-medium active" onclick="switchTab('manual')">
+                        📏 Ingreso Manual
+                    </button>
+                    <button id="mapTab" class="tab-button flex-1 py-2 px-4 rounded-md font-medium" onclick="switchTab('map')">
+                        🗺️ Usar Mapa
+                    </button>
+                </div>
+
+                <!-- Manual Input -->
+                <div id="manualInput">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            🛣️ Kilómetros totales del viaje
+                        </label>
+                        <div class="relative">
+                            <input type="number" id="kilometersManual" class="w-full pr-12 pl-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="150" step="0.1">
+                            <span class="absolute right-3 top-3 text-gray-500">km</span>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">💡 Ingresa la distancia total de tu viaje (ida + vuelta + paradas)</p>
+                    </div>
+
+                    <!-- Multiple Segments Option -->
+                    <div class="border-t border-gray-200 pt-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <label class="text-sm font-medium text-gray-700">🎯 Viaje con múltiples destinos</label>
+                            <button id="toggleSegments" class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition-colors" onclick="toggleMultipleSegments()">
+                                Activar
+                            </button>
+                        </div>
+                        
+                        <div id="segmentsContainer" class="hidden">
+                            <p class="text-xs text-gray-500 mb-3">Agrega cada tramo de tu viaje por separado:</p>
+                            <div id="segmentsList">
+                                <!-- Segments will be added here -->
+                            </div>
+                            <button onclick="addSegment()" class="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors text-sm">
+                                ➕ Agregar Tramo
+                            </button>
+                            <div class="mt-3 p-3 bg-blue-50 rounded-lg">
+                                <div class="text-sm font-medium text-blue-800">Total: <span id="segmentsTotal">0</span> km</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="bg-white p-6 rounded-xl shadow-sm">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        🛣️ Kilómetros recorridos
-                    </label>
-                    <div class="relative">
-                        <input type="number" id="kilometers" class="w-full pr-12 pl-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="100" step="0.1">
-                        <span class="absolute right-3 top-3 text-gray-500">km</span>
+                <!-- Map Input -->
+                <div id="mapInput" class="hidden">
+                    <div class="map-instructions">
+                        <div class="flex items-center mb-2">
+                            <span class="text-2xl mr-3">📍</span>
+                            <div>
+                                <strong>Instrucciones:</strong> Haz clic en el mapa para crear tu ruta
+                            </div>
+                        </div>
+                        <div class="text-sm opacity-90 ml-9">
+                            • 1° clic: Origen 🚩<br>
+                            • 2° clic: Destino/Parada 🏁<br>
+                            • 3° clic: Otra parada 🎯 (opcional)<br>
+                            • Y así sucesivamente...
+                        </div>
+                    </div>
+                    
+                    <div id="map" class="map-container"></div>
+                    
+                    <!-- Waypoints List -->
+                    <div id="waypointsContainer" class="waypoint-controls hidden">
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="font-semibold text-gray-700">📍 Puntos del Viaje</h4>
+                            <button onclick="resetMap()" class="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600 transition-colors">
+                                🔄 Reiniciar
+                            </button>
+                        </div>
+                        <div id="waypointsList">
+                            <!-- Waypoints will be populated here -->
+                        </div>
+                        <div class="mt-3 p-3 bg-green-50 rounded-lg">
+                            <div class="text-sm font-medium text-green-800">
+                                📏 Distancia total: <span id="totalMapDistance">0</span> km
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <button onclick="calculateFuel()" class="w-full mt-6 bg-gradient-to-r from-blue-500 to-purple-600 text-white py-4 rounded-xl text-lg font-semibold hover:from-blue-600 hover:to-purple-700 transition-all duration-300 transform hover:scale-105">
+            <!-- Fuel Price Input -->
+            <div class="bg-white p-6 rounded-xl shadow-sm mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    💰 Precio actual de la bencina (por litro)
+                </label>
+                <div class="relative">
+                    <span class="absolute left-3 top-3 text-gray-500">$</span>
+                    <input type="number" id="fuelPrice" class="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="1500" step="0.01">
+                </div>
+            </div>
+
+            <button onclick="calculateFuel()" class="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-4 rounded-xl text-lg font-semibold hover:from-blue-600 hover:to-purple-700 transition-all duration-300 transform hover:scale-105">
                 Calcular Gasto
             </button>
 
@@ -115,6 +240,9 @@
                             <div class="text-sm text-gray-600">Costo por km</div>
                         </div>
                     </div>
+                    <div id="tripBreakdown" class="mt-4 hidden">
+                        <!-- Trip breakdown will be shown here for multi-destination trips -->
+                    </div>
                 </div>
             </div>
         </div>
@@ -131,6 +259,9 @@
         </div>
     </div>
 
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
     <script>
         // Car data
         const cars = {
@@ -144,6 +275,13 @@
 
         let selectedCar = null;
         let calculations = [];
+        let map = null;
+        let currentTab = 'manual';
+        let waypoints = [];
+        let markers = [];
+        let routeLine = null;
+        let segmentCount = 0;
+        let multipleSegmentsActive = false;
 
         function selectCar(carId) {
             selectedCar = cars[carId];
@@ -163,6 +301,241 @@
             `;
         }
 
+        function switchTab(tab) {
+            currentTab = tab;
+            
+            // Update tab buttons
+            document.getElementById('manualTab').classList.remove('active');
+            document.getElementById('mapTab').classList.remove('active');
+            document.getElementById(tab + 'Tab').classList.add('active');
+            
+            // Show/hide content
+            if (tab === 'manual') {
+                document.getElementById('manualInput').classList.remove('hidden');
+                document.getElementById('mapInput').classList.add('hidden');
+            } else {
+                document.getElementById('manualInput').classList.add('hidden');
+                document.getElementById('mapInput').classList.remove('hidden');
+                initializeMap();
+            }
+        }
+
+        function toggleMultipleSegments() {
+            multipleSegmentsActive = !multipleSegmentsActive;
+            const container = document.getElementById('segmentsContainer');
+            const button = document.getElementById('toggleSegments');
+            
+            if (multipleSegmentsActive) {
+                container.classList.remove('hidden');
+                button.textContent = 'Desactivar';
+                button.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+                button.classList.add('bg-red-500', 'hover:bg-red-600');
+                addSegment(); // Add first segment
+            } else {
+                container.classList.add('hidden');
+                button.textContent = 'Activar';
+                button.classList.remove('bg-red-500', 'hover:bg-red-600');
+                button.classList.add('bg-blue-500', 'hover:bg-blue-600');
+                clearSegments();
+            }
+        }
+
+        function addSegment() {
+            segmentCount++;
+            const segmentsList = document.getElementById('segmentsList');
+            const segmentDiv = document.createElement('div');
+            segmentDiv.className = 'flex items-center gap-2 mb-2';
+            segmentDiv.innerHTML = `
+                <span class="text-sm font-medium w-16">Tramo ${segmentCount}:</span>
+                <input type="number" class="segment-input flex-1 px-3 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500" 
+                       placeholder="0" step="0.1" oninput="updateSegmentsTotal()">
+                <span class="text-sm text-gray-500">km</span>
+                <button onclick="removeSegment(this)" class="text-red-500 hover:text-red-700">✕</button>
+            `;
+            segmentsList.appendChild(segmentDiv);
+        }
+
+        function removeSegment(button) {
+            button.parentElement.remove();
+            updateSegmentsTotal();
+        }
+
+        function clearSegments() {
+            document.getElementById('segmentsList').innerHTML = '';
+            segmentCount = 0;
+            updateSegmentsTotal();
+        }
+
+        function updateSegmentsTotal() {
+            const inputs = document.querySelectorAll('.segment-input');
+            let total = 0;
+            inputs.forEach(input => {
+                const value = parseFloat(input.value) || 0;
+                total += value;
+            });
+            document.getElementById('segmentsTotal').textContent = total.toFixed(1);
+        }
+
+        function initializeMap() {
+            if (map) return; // Map already initialized
+            
+            // Initialize map centered on Santiago, Chile
+            map = L.map('map').setView([-33.4489, -70.6693], 12);
+            
+            // Add OpenStreetMap tiles
+            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            }).addTo(map);
+
+            // Add click event listener
+            map.on('click', function(e) {
+                addWaypoint(e.latlng);
+            });
+        }
+
+        function addWaypoint(latlng) {
+            waypoints.push(latlng);
+            
+            let markerType, popupText, markerIcon;
+            
+            if (waypoints.length === 1) {
+                // Origin
+                markerType = 'origin';
+                popupText = '🚩 Origen';
+                markerIcon = '🚩';
+            } else if (waypoints.length === 2) {
+                // First destination
+                markerType = 'destination';
+                popupText = '🏁 Destino';
+                markerIcon = '🏁';
+            } else {
+                // Additional stops
+                markerType = 'stop';
+                popupText = `🎯 Parada ${waypoints.length - 1}`;
+                markerIcon = '🎯';
+            }
+            
+            // Create custom icon
+            const customIcon = L.divIcon({
+                html: `<div style="background: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border: 2px solid #333; font-size: 16px;">${markerIcon}</div>`,
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            });
+            
+            const marker = L.marker(latlng, { icon: customIcon }).addTo(map)
+                .bindPopup(`${popupText}<br/>${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`);
+            
+            markers.push(marker);
+            
+            // Update route line
+            updateRouteLine();
+            updateWaypointsList();
+            updateTotalDistance();
+        }
+
+        function updateRouteLine() {
+            if (routeLine) {
+                map.removeLayer(routeLine);
+            }
+            
+            if (waypoints.length >= 2) {
+                routeLine = L.polyline(waypoints, {
+                    color: 'red',
+                    weight: 4,
+                    opacity: 0.7,
+                    dashArray: '10, 5'
+                }).addTo(map);
+                
+                // Fit map to show all waypoints
+                map.fitBounds(routeLine.getBounds(), { padding: [20, 20] });
+            }
+        }
+
+        function updateWaypointsList() {
+            const container = document.getElementById('waypointsContainer');
+            const list = document.getElementById('waypointsList');
+            
+            if (waypoints.length === 0) {
+                container.classList.add('hidden');
+                return;
+            }
+            
+            container.classList.remove('hidden');
+            
+            list.innerHTML = waypoints.map((point, index) => {
+                let type, icon, label;
+                if (index === 0) {
+                    type = 'origin';
+                    icon = '🚩';
+                    label = 'Origen';
+                } else if (index === waypoints.length - 1 && waypoints.length === 2) {
+                    type = 'destination';
+                    icon = '🏁';
+                    label = 'Destino';
+                } else {
+                    type = 'stop';
+                    icon = '🎯';
+                    label = index === waypoints.length - 1 ? 'Destino Final' : `Parada ${index}`;
+                }
+                
+                return `
+                    <div class="waypoint-item ${type}">
+                        <span class="text-lg mr-3">${icon}</span>
+                        <div class="flex-1">
+                            <div class="font-medium text-gray-700">${label}</div>
+                            <div class="text-xs text-gray-500">${point.lat.toFixed(6)}, ${point.lng.toFixed(6)}</div>
+                        </div>
+                        <button onclick="removeWaypoint(${index})" class="text-red-500 hover:text-red-700 ml-2">✕</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function removeWaypoint(index) {
+            waypoints.splice(index, 1);
+            map.removeLayer(markers[index]);
+            markers.splice(index, 1);
+            
+            updateRouteLine();
+            updateWaypointsList();
+            updateTotalDistance();
+        }
+
+        function updateTotalDistance() {
+            if (waypoints.length < 2) {
+                document.getElementById('totalMapDistance').textContent = '0';
+                return;
+            }
+            
+            let totalDistance = 0;
+            for (let i = 0; i < waypoints.length - 1; i++) {
+                totalDistance += map.distance(waypoints[i], waypoints[i + 1]);
+            }
+            
+            const distanceKm = (totalDistance / 1000).toFixed(2);
+            document.getElementById('totalMapDistance').textContent = distanceKm;
+        }
+
+        function resetMap() {
+            // Clear all markers
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+            
+            // Clear route line
+            if (routeLine) {
+                map.removeLayer(routeLine);
+                routeLine = null;
+            }
+            
+            // Clear waypoints
+            waypoints = [];
+            
+            // Update UI
+            updateWaypointsList();
+            updateTotalDistance();
+        }
+
         function goBack() {
             document.getElementById('calculator').classList.add('hidden');
             document.getElementById('carSelection').classList.remove('hidden');
@@ -171,12 +544,44 @@
             
             // Clear inputs
             document.getElementById('fuelPrice').value = '';
-            document.getElementById('kilometers').value = '';
+            document.getElementById('kilometersManual').value = '';
+            
+            // Reset map
+            if (map) {
+                resetMap();
+            }
+            
+            // Reset segments
+            if (multipleSegmentsActive) {
+                toggleMultipleSegments();
+            }
+            
+            // Reset to manual tab
+            switchTab('manual');
         }
 
         function calculateFuel() {
             const fuelPrice = parseFloat(document.getElementById('fuelPrice').value);
-            const kilometers = parseFloat(document.getElementById('kilometers').value);
+            let kilometers = 0;
+            let tripDetails = '';
+            
+            // Get kilometers based on current tab and mode
+            if (currentTab === 'manual') {
+                if (multipleSegmentsActive) {
+                    const segments = document.querySelectorAll('.segment-input');
+                    segments.forEach(input => {
+                        kilometers += parseFloat(input.value) || 0;
+                    });
+                    tripDetails = `${segments.length} tramos`;
+                } else {
+                    kilometers = parseFloat(document.getElementById('kilometersManual').value) || 0;
+                    tripDetails = 'Manual';
+                }
+            } else {
+                const mapDistance = document.getElementById('totalMapDistance').textContent;
+                kilometers = parseFloat(mapDistance) || 0;
+                tripDetails = `${waypoints.length} puntos en mapa`;
+            }
 
             if (!fuelPrice || !kilometers || fuelPrice <= 0 || kilometers <= 0) {
                 alert('Por favor ingresa valores válidos para el precio y los kilómetros.');
@@ -193,6 +598,23 @@
             document.getElementById('totalCost').textContent = '$' + totalCost.toFixed(0);
             document.getElementById('costPerKm').textContent = '$' + costPerKm.toFixed(0);
 
+            // Show trip breakdown for multi-destination trips
+            let breakdownHtml = '';
+            if (currentTab === 'map' && waypoints.length > 2) {
+                breakdownHtml = '<div class="mt-4 p-4 bg-gray-50 rounded-lg"><h4 class="font-semibold text-gray-700 mb-2">🗺️ Desglose del viaje:</h4>';
+                for (let i = 0; i < waypoints.length - 1; i++) {
+                    const segmentDistance = map.distance(waypoints[i], waypoints[i + 1]) / 1000;
+                    const segmentCost = (segmentDistance / selectedCar.consumption) * fuelPrice;
+                    const fromLabel = i === 0 ? 'Origen' : `Parada ${i}`;
+                    const toLabel = i === waypoints.length - 2 ? 'Destino' : `Parada ${i + 1}`;
+                    breakdownHtml += `<div class="text-sm text-gray-600">${fromLabel} → ${toLabel}: ${segmentDistance.toFixed(1)} km ($${segmentCost.toFixed(0)})</div>`;
+                }
+                breakdownHtml += '</div>';
+            }
+            
+            document.getElementById('tripBreakdown').innerHTML = breakdownHtml;
+            document.getElementById('tripBreakdown').classList.toggle('hidden', breakdownHtml === '');
+
             // Show results
             document.getElementById('results').classList.remove('hidden');
 
@@ -204,7 +626,9 @@
                 fuelPrice: fuelPrice,
                 litersUsed: litersUsed,
                 totalCost: totalCost,
-                costPerKm: costPerKm
+                costPerKm: costPerKm,
+                method: currentTab === 'map' ? 'Mapa' : 'Manual',
+                details: tripDetails
             };
 
             calculations.unshift(calculation);
@@ -228,11 +652,11 @@
                             <div class="font-semibold text-gray-700">${calc.car}</div>
                             <div class="text-sm text-gray-600">${calc.date}</div>
                             <div class="text-sm text-gray-600 mt-1">
-                                ${calc.kilometers} km • $${calc.fuelPrice}/L
+                                ${calc.kilometers} km • ${calc.fuelPrice}/L • ${calc.method} (${calc.details})
                             </div>
                         </div>
                         <div class="text-right">
-                            <div class="text-lg font-bold text-green-600">$${calc.totalCost.toFixed(0)}</div>
+                            <div class="text-lg font-bold text-green-600">${calc.totalCost.toFixed(0)}</div>
                             <div class="text-xs text-gray-500">${calc.litersUsed.toFixed(2)}L</div>
                         </div>
                     </div>
