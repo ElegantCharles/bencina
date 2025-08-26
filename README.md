@@ -158,10 +158,10 @@ Este proyecto está bajo la **Licencia MIT** - mira el archivo [LICENSE](LICENSE
 
 ## 📞 Contacto
 
-- **👤 Autor**: Tu Nombre
-- **📧 Email**: tu.email@ejemplo.com
-- **🐙 GitHub**: [@tu-usuario](https://github.com/ElegantCharles)
-- **🌐 Website**: [tu-website.com](https://charleslettuce.me)
+- **👤 Autor**: Charles
+- **📧 Email**: no jeje
+- **🐙 GitHub**: [@ElegantCharles](https://github.com/ElegantCharles)
+- **🌐 Website**: [charleslettuce.me](https://charleslettuce.me)
 
 ---
 
