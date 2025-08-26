@@ -67,7 +67,7 @@ Una aplicación web moderna y fácil de usar para calcular el gasto en combustib
 ### Opción 2: Clonar Repositorio
 ```bash
 # Clonar el repositorio
-git clone https://github.com/tu-usuario/calculadora-combustible.git
+git clone https://github.com/ElegantCharles/bencina.git/
 
 # Navegar al directorio
 cd calculadora-combustible
